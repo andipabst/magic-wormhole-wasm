@@ -1,0 +1,16 @@
+{
+  "name": "magic-wormhole-wasm",
+  "collaborators": [
+    "andi <andipabst25@gmail.com>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "magic_wormhole_wasm_bg.wasm",
+    "magic_wormhole_wasm.js",
+    "magic_wormhole_wasm_bg.js",
+    "magic_wormhole_wasm.d.ts"
+  ],
+  "module": "magic_wormhole_wasm.js",
+  "types": "magic_wormhole_wasm.d.ts",
+  "sideEffects": false
+}
