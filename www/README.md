@@ -13,7 +13,7 @@
     <span> | </span>
     <a href="https://discordapp.com/channels/442252698964721669/443151097398296587">Chat</a>
   </h3>
-
+.
   <sub>Built with 🦀🕸 by <a href="https://rustwasm.github.io/">The Rust and WebAssembly Working Group</a></sub>
 </div>
 
