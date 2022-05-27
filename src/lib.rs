@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use magic_wormhole::{Code, transfer, transit, Wormhole, WormholeError};
+use magic_wormhole::{transfer, transit, Code, Wormhole};
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wee_alloc")]
@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::*;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
-extern {
+extern "C" {
     fn alert(s: &str);
 
     #[wasm_bindgen(js_namespace = console)]
@@ -36,14 +36,16 @@ struct NoOpFuture {}
 impl Future for NoOpFuture {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         Poll::Pending
     }
 }
 
 #[wasm_bindgen]
 pub async fn send(file_input: web_sys::HtmlInputElement, output: web_sys::HtmlElement) {
-    let file_list = file_input.files().expect("Failed to get filelist from File Input!");
+    let file_list = file_input
+        .files()
+        .expect("Failed to get filelist from File Input!");
     if file_list.length() < 1 || file_list.get(0) == None {
         alert("Please select at least one valid file.");
         return;
@@ -60,12 +62,7 @@ pub async fn send(file_input: web_sys::HtmlInputElement, output: web_sys::HtmlEl
 
             output.set_inner_text("connecting...");
 
-            send_via_wormhole(
-                data_to_send,
-                len,
-                file.name(),
-                &output,
-            ).await
+            send_via_wormhole(data_to_send, len, file.name(), &output).await
         }
         Err(_) => {
             console_log!("Error reading file");
@@ -73,9 +70,14 @@ pub async fn send(file_input: web_sys::HtmlInputElement, output: web_sys::HtmlEl
     }
 }
 
-async fn send_via_wormhole(file: Vec<u8>, file_size: u64, file_name: String, output: &web_sys::HtmlElement) {
+async fn send_via_wormhole(
+    file: Vec<u8>,
+    file_size: u64,
+    file_name: String,
+    output: &web_sys::HtmlElement,
+) {
     let connect = Wormhole::connect_without_code(
-        transfer::APP_CONFIG.rendezvous_url("ws://relay.magic-wormhole.io:4000/v1".into()),
+        transfer::APP_CONFIG.rendezvous_url("wss://relay.magic-wormhole.io:443/v1".into()),
         2,
     );
 
@@ -88,7 +90,7 @@ async fn send_via_wormhole(file: Vec<u8>, file_size: u64, file_name: String, out
                 Ok(wormhole) => {
                     let transfer_result = transfer::send_file(
                         wormhole,
-                        url::Url::parse("ws://piegames.de:4002").unwrap(),
+                        url::Url::parse("wss://magic-wormhole-transit-relay.andicodes.de:443").unwrap(),
                         &mut &file[..],
                         PathBuf::from(file_name),
                         file_size,
@@ -100,7 +102,8 @@ async fn send_via_wormhole(file: Vec<u8>, file_size: u64, file_name: String, out
                             console_log!("Progress: {}/{}", cur, total);
                         },
                         NoOpFuture {},
-                    ).await;
+                    )
+                    .await;
 
                     match transfer_result {
                         Ok(_) => {
@@ -132,7 +135,7 @@ pub struct ReceiveResult {
 #[wasm_bindgen]
 pub async fn receive(code: String, output: web_sys::HtmlElement) -> Option<JsValue> {
     let connect = Wormhole::connect_with_code(
-        transfer::APP_CONFIG.rendezvous_url("ws://relay.magic-wormhole.io:4000/v1".into()),
+        transfer::APP_CONFIG.rendezvous_url("wss://relay.magic-wormhole.io:443/v1".into()),
         Code(code),
     );
 
@@ -140,10 +143,11 @@ pub async fn receive(code: String, output: web_sys::HtmlElement) -> Option<JsVal
         Ok((_, wormhole)) => {
             let req = transfer::request_file(
                 wormhole,
-                url::Url::parse("ws://piegames.de:4002").unwrap(),
+                url::Url::parse("wss://magic-wormhole-transit-relay.andicodes.de:443").unwrap(),
                 transit::Abilities::FORCE_RELAY,
                 NoOpFuture {},
-            ).await;
+            )
+            .await;
 
             let mut file: Vec<u8> = Vec::new();
 
