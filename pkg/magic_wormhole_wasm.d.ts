@@ -1,17 +1,42 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
-*/
-export function init(): void;
-/**
+* @param {WormholeConfig} config
 * @param {HTMLInputElement} file_input
-* @param {HTMLElement} output
-* @returns {Promise<void>}
+* @param {Function} progress_handler
+* @returns {Promise<any>}
 */
-export function send(file_input: HTMLInputElement, output: HTMLElement): Promise<void>;
+export function send(config: WormholeConfig, file_input: HTMLInputElement, progress_handler: Function): Promise<any>;
 /**
+* @param {WormholeConfig} config
 * @param {string} code
-* @param {HTMLElement} output
-* @returns {Promise<any | undefined>}
+* @param {Function} progress_handler
+* @returns {Promise<any>}
 */
-export function receive(code: string, output: HTMLElement): Promise<any | undefined>;
+export function receive(config: WormholeConfig, code: string, progress_handler: Function): Promise<any>;
+/**
+*/
+export enum EventType {
+  None,
+  Progress,
+  ServerWelcome,
+  FileMetadata,
+  ConnectedToRelay,
+  Code,
+}
+/**
+*/
+export class Event {
+  free(): void;
+}
+/**
+*/
+export class WormholeConfig {
+  free(): void;
+/**
+* @param {string} rendezvous_url
+* @param {string} relay_url
+* @returns {WormholeConfig}
+*/
+  static new(rendezvous_url: string, relay_url: string): WormholeConfig;
+}

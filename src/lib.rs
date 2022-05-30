@@ -1,10 +1,14 @@
+use std::error::Error;
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use magic_wormhole::{transfer, transit, Code, Wormhole};
+use magic_wormhole::{Code, transfer, transit, Wormhole};
 use wasm_bindgen::prelude::*;
+use log::Level;
+
+mod event;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -12,8 +16,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
 extern "C" {
-    fn alert(s: &str);
-
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
 }
@@ -25,10 +27,24 @@ macro_rules! console_log {
 }
 
 #[wasm_bindgen]
-pub fn init() {
-    wasm_logger::init(wasm_logger::Config::default());
-    #[cfg(feature = "console_error_panic_hook")]
-    console_error_panic_hook::set_once();
+pub struct WormholeConfig {
+    rendezvous_url: String,
+    relay_url: String,
+}
+
+#[wasm_bindgen]
+impl WormholeConfig {
+    pub fn new(rendezvous_url: String, relay_url: String) -> WormholeConfig {
+        wasm_logger::init(wasm_logger::Config::new(Level::Info));
+
+        #[cfg(feature = "console_error_panic_hook")]
+        console_error_panic_hook::set_once();
+
+        WormholeConfig {
+            rendezvous_url,
+            relay_url,
+        }
+    }
 }
 
 struct NoOpFuture {}
@@ -42,87 +58,48 @@ impl Future for NoOpFuture {
 }
 
 #[wasm_bindgen]
-pub async fn send(file_input: web_sys::HtmlInputElement, output: web_sys::HtmlElement) {
+pub async fn send(config: WormholeConfig, file_input: web_sys::HtmlInputElement, progress_handler: js_sys::Function) -> Result<JsValue, JsValue> {
+    let this = JsValue::null();
+
     let file_list = file_input
         .files()
         .expect("Failed to get filelist from File Input!");
     if file_list.length() < 1 || file_list.get(0) == None {
-        alert("Please select at least one valid file.");
-        return;
+        return Err("Please select at least one valid file.".into());
     }
 
     let file: web_sys::File = file_list.get(0).expect("Failed to get File from filelist!");
+    let file_content = wasm_bindgen_futures::JsFuture::from(file.array_buffer()).await?;
+    let array = js_sys::Uint8Array::new(&file_content);
+    let len = array.byte_length() as u64;
+    let data_to_send: Vec<u8> = array.to_vec();
 
-    match wasm_bindgen_futures::JsFuture::from(file.array_buffer()).await {
-        Ok(file_content) => {
-            let array = js_sys::Uint8Array::new(&file_content);
-            let len = array.byte_length() as u64;
-            let data_to_send: Vec<u8> = array.to_vec();
-            console_log!("Read raw data ({} bytes)", len);
-
-            output.set_inner_text("connecting...");
-
-            send_via_wormhole(data_to_send, len, file.name(), &output).await
-        }
-        Err(_) => {
-            console_log!("Error reading file");
-        }
-    }
-}
-
-async fn send_via_wormhole(
-    file: Vec<u8>,
-    file_size: u64,
-    file_name: String,
-    output: &web_sys::HtmlElement,
-) {
-    let connect = Wormhole::connect_without_code(
-        transfer::APP_CONFIG.rendezvous_url("wss://relay.magic-wormhole.io:443/v1".into()),
+    let (server_welcome, connector) = Wormhole::connect_without_code(
+        transfer::APP_CONFIG.rendezvous_url(config.rendezvous_url.into()),
         2,
-    );
+    ).await.map_err(stringify)?;
 
-    match connect.await {
-        Ok((server_welcome, connector)) => {
-            console_log!("{}", server_welcome.code);
-            output.set_inner_text(&format!("wormhole code:  {}", server_welcome.code));
+    progress_handler.call1(&this, &event::code(server_welcome.code.0))?;
 
-            match connector.await {
-                Ok(wormhole) => {
-                    let transfer_result = transfer::send_file(
-                        wormhole,
-                        url::Url::parse("wss://magic-wormhole-transit-relay.andicodes.de:443").unwrap(),
-                        &mut &file[..],
-                        PathBuf::from(file_name),
-                        file_size,
-                        transit::Abilities::FORCE_RELAY,
-                        |info, address| {
-                            console_log!("Connected to '{:?}' on address {:?}", info, address);
-                        },
-                        |cur, total| {
-                            console_log!("Progress: {}/{}", cur, total);
-                        },
-                        NoOpFuture {},
-                    )
-                    .await;
+    let wormhole = connector.await.map_err(stringify)?;
+    transfer::send_file(
+        wormhole,
+        url::Url::parse(&config.relay_url).unwrap(),
+        &mut &data_to_send[..],
+        PathBuf::from(file.name()),
+        len,
+        transit::Abilities::FORCE_RELAY,
+        |_info, _address| {
+            progress_handler.call1(&this, &event::connected());
+        },
+        |cur, total| {
+            // TODO send progress via the progress handler
+            console_log!("Progress: {}/{}", cur, total);
+        },
+        NoOpFuture {},
+    ).await.map_err(stringify)?;
 
-                    match transfer_result {
-                        Ok(_) => {
-                            console_log!("Data sent");
-                        }
-                        Err(e) => {
-                            console_log!("Error in data transfer: {:?}", e);
-                        }
-                    }
-                }
-                Err(_) => {
-                    console_log!("Error waiting for connection");
-                }
-            }
-        }
-        Err(_) => {
-            console_log!("Error in connection");
-        }
-    };
+    Ok("".into())
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -132,68 +109,47 @@ pub struct ReceiveResult {
     filesize: u64,
 }
 
+fn stringify(e: impl Error) -> String { format!("error code: {}", e) }
+
 #[wasm_bindgen]
-pub async fn receive(code: String, output: web_sys::HtmlElement) -> Option<JsValue> {
-    let connect = Wormhole::connect_with_code(
-        transfer::APP_CONFIG.rendezvous_url("wss://relay.magic-wormhole.io:443/v1".into()),
+pub async fn receive(config: WormholeConfig, code: String, progress_handler: js_sys::Function) -> Result<JsValue, JsValue> {
+    let this = JsValue::null();
+
+    let (server_welcome, wormhole) = Wormhole::connect_with_code(
+        transfer::APP_CONFIG.rendezvous_url(config.rendezvous_url.into()),
         Code(code),
-    );
+    ).await.map_err(stringify)?;
 
-    return match connect.await {
-        Ok((_, wormhole)) => {
-            let req = transfer::request_file(
-                wormhole,
-                url::Url::parse("wss://magic-wormhole-transit-relay.andicodes.de:443").unwrap(),
-                transit::Abilities::FORCE_RELAY,
-                NoOpFuture {},
-            )
-            .await;
+    progress_handler.call1(&this, &event::server_welcome(server_welcome.welcome.unwrap_or_default()))?;
 
-            let mut file: Vec<u8> = Vec::new();
+    let req = transfer::request_file(
+        wormhole,
+        url::Url::parse(&config.relay_url).unwrap(),
+        transit::Abilities::FORCE_RELAY,
+        NoOpFuture {},
+    ).await.map_err(stringify)?.ok_or("")?;
 
-            match req {
-                Ok(Some(req)) => {
-                    let filename = req.filename.clone();
-                    let filesize = req.filesize;
-                    console_log!("File name: {:?}, size: {}", filename, filesize);
-                    let file_accept = req.accept(
-                        |info, address| {
-                            console_log!("Connected to '{:?}' on address {:?}", info, address);
-                        },
-                        |cur, total| {
-                            console_log!("Progress: {}/{}", cur, total);
-                        },
-                        &mut file,
-                        NoOpFuture {},
-                    );
+    let filename = req.filename.to_str().unwrap_or_default().to_string();
+    let filesize = req.filesize;
+    progress_handler.call1(&this, &event::file_metadata(filename.clone(), filesize))?;
 
-                    match file_accept.await {
-                        Ok(_) => {
-                            console_log!("Data received, length: {}", file.len());
-                            //let array: js_sys::Array = file.into_iter().map(JsValue::from).collect();
-                            //data: js_sys::Uint8Array::new(&array),
-                            let result = ReceiveResult {
-                                data: file,
-                                filename: filename.to_str().unwrap_or_default().into(),
-                                filesize,
-                            };
-                            return Some(JsValue::from_serde(&result).unwrap());
-                        }
-                        Err(e) => {
-                            console_log!("Error in data transfer: {:?}", e);
-                            None
-                        }
-                    }
-                }
-                _ => {
-                    console_log!("No ReceiveRequest");
-                    None
-                }
-            }
-        }
-        Err(_) => {
-            output.set_inner_text("Error in connection");
-            None
-        }
+    let mut file: Vec<u8> = Vec::new();
+    req.accept(
+        |_info, _address| {
+            progress_handler.call1(&this, &event::connected());
+        },
+        |cur, total| {
+            // TODO send progress via the progress handler
+            console_log!("Progress: {}/{}", cur, total);
+        },
+        &mut file,
+        NoOpFuture {},
+    ).await.map_err(stringify)?;
+
+    let result = ReceiveResult {
+        data: file,
+        filename,
+        filesize,
     };
+    Ok(JsValue::from_serde(&result).unwrap())
 }

@@ -23,6 +23,7 @@ clear_on_drop = { version = "0.2.5", features = ["no_cc"] }
 magic-wormhole = { path = "../magic-wormhole.rs" }
 web-sys = { version = "0.3.57", features = ["HtmlElement", "HtmlInputElement", "FileReader", "ProgressEvent", "FileList", "File", "Blob"] }
 js-sys = "0.3.57"
+log = "0.4.17"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
