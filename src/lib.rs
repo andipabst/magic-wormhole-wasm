@@ -2,29 +2,18 @@ use std::error::Error;
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
+use std::rc::Rc;
 use std::task::{Context, Poll};
 
+use log::Level;
 use magic_wormhole::{Code, transfer, transit, Wormhole};
 use wasm_bindgen::prelude::*;
-use log::Level;
 
 mod event;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
-macro_rules! console_log {
-    // Note that this is using the `log` function imported above during
-    // `bare_bones`
-    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-}
 
 #[wasm_bindgen]
 pub struct WormholeConfig {
@@ -59,7 +48,9 @@ impl Future for NoOpFuture {
 
 #[wasm_bindgen]
 pub async fn send(config: WormholeConfig, file_input: web_sys::HtmlInputElement, progress_handler: js_sys::Function) -> Result<JsValue, JsValue> {
-    let this = JsValue::null();
+    let event_handler = Rc::new(Box::new(move |e: event::Event| {
+        progress_handler.call1(&JsValue::null(), &JsValue::from_serde(&e).unwrap()).expect("progress_handler call should succeed");
+    }) as Box<dyn Fn(event::Event)>);
 
     let file_list = file_input
         .files()
@@ -79,8 +70,9 @@ pub async fn send(config: WormholeConfig, file_input: web_sys::HtmlInputElement,
         2,
     ).await.map_err(stringify)?;
 
-    progress_handler.call1(&this, &event::code(server_welcome.code.0))?;
+    event_handler(event::code(server_welcome.code.0));
 
+    let ph = event_handler.clone();
     let wormhole = connector.await.map_err(stringify)?;
     transfer::send_file(
         wormhole,
@@ -90,11 +82,10 @@ pub async fn send(config: WormholeConfig, file_input: web_sys::HtmlInputElement,
         len,
         transit::Abilities::FORCE_RELAY,
         |_info, _address| {
-            progress_handler.call1(&this, &event::connected());
+            event_handler(event::connected());
         },
-        |cur, total| {
-            // TODO send progress via the progress handler
-            console_log!("Progress: {}/{}", cur, total);
+        move |cur, total| {
+            ph(event::progress(cur, total));
         },
         NoOpFuture {},
     ).await.map_err(stringify)?;
@@ -113,14 +104,16 @@ fn stringify(e: impl Error) -> String { format!("error code: {}", e) }
 
 #[wasm_bindgen]
 pub async fn receive(config: WormholeConfig, code: String, progress_handler: js_sys::Function) -> Result<JsValue, JsValue> {
-    let this = JsValue::null();
+    let event_handler = Rc::new(Box::new(move |e: event::Event| {
+        progress_handler.call1(&JsValue::null(), &JsValue::from_serde(&e).unwrap()).expect("progress_handler call should succeed");
+    }) as Box<dyn Fn(event::Event)>);
 
     let (server_welcome, wormhole) = Wormhole::connect_with_code(
         transfer::APP_CONFIG.rendezvous_url(config.rendezvous_url.into()),
         Code(code),
     ).await.map_err(stringify)?;
 
-    progress_handler.call1(&this, &event::server_welcome(server_welcome.welcome.unwrap_or_default()))?;
+    event_handler(event::server_welcome(server_welcome.welcome.unwrap_or_default()));
 
     let req = transfer::request_file(
         wormhole,
@@ -131,16 +124,16 @@ pub async fn receive(config: WormholeConfig, code: String, progress_handler: js_
 
     let filename = req.filename.to_str().unwrap_or_default().to_string();
     let filesize = req.filesize;
-    progress_handler.call1(&this, &event::file_metadata(filename.clone(), filesize))?;
+    event_handler(event::file_metadata(filename.clone(), filesize));
 
+    let ph = event_handler.clone();
     let mut file: Vec<u8> = Vec::new();
     req.accept(
         |_info, _address| {
-            progress_handler.call1(&this, &event::connected());
+            event_handler(event::connected());
         },
-        |cur, total| {
-            // TODO send progress via the progress handler
-            console_log!("Progress: {}/{}", cur, total);
+        move |cur, total| {
+            ph(event::progress(cur, total));
         },
         &mut file,
         NoOpFuture {},
