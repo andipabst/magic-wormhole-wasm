@@ -206,11 +206,11 @@ function makeMutClosure(arg0, arg1, dtor, f) {
     return real;
 }
 function __wbg_adapter_26(arg0, arg1, arg2) {
-    wasm._dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h2ac73c3e72506690(arg0, arg1, addHeapObject(arg2));
+    wasm._dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h066cd66018fcf488(arg0, arg1, addHeapObject(arg2));
 }
 
 function __wbg_adapter_29(arg0, arg1, arg2) {
-    wasm._dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__hd15475db14bcc0af(arg0, arg1, addHeapObject(arg2));
+    wasm._dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h04abb289d408fe2c(arg0, arg1, addHeapObject(arg2));
 }
 
 function __wbg_adapter_32(arg0, arg1, arg2) {
@@ -218,7 +218,7 @@ function __wbg_adapter_32(arg0, arg1, arg2) {
 }
 
 function __wbg_adapter_35(arg0, arg1) {
-    wasm._dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__hff69bbbfde40c465(arg0, arg1);
+    wasm._dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__ha806dc97820a9f6e(arg0, arg1);
 }
 
 function _assertClass(instance, klass) {
@@ -230,30 +230,32 @@ function _assertClass(instance, klass) {
 /**
 * @param {WormholeConfig} config
 * @param {HTMLInputElement} file_input
+* @param {Promise<any>} cancel
 * @param {Function} progress_handler
 * @returns {Promise<any>}
 */
-export function send(config, file_input, progress_handler) {
+export function send(config, file_input, cancel, progress_handler) {
     _assertClass(config, WormholeConfig);
     var ptr0 = config.ptr;
     config.ptr = 0;
-    const ret = wasm.send(ptr0, addHeapObject(file_input), addHeapObject(progress_handler));
+    const ret = wasm.send(ptr0, addHeapObject(file_input), addHeapObject(cancel), addHeapObject(progress_handler));
     return takeObject(ret);
 }
 
 /**
 * @param {WormholeConfig} config
 * @param {string} code
+* @param {Promise<any>} cancel
 * @param {Function} progress_handler
 * @returns {Promise<any>}
 */
-export function receive(config, code, progress_handler) {
+export function receive(config, code, cancel, progress_handler) {
     _assertClass(config, WormholeConfig);
     var ptr0 = config.ptr;
     config.ptr = 0;
     const ptr1 = passStringToWasm0(code, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.receive(ptr0, ptr1, len1, addHeapObject(progress_handler));
+    const ret = wasm.receive(ptr0, ptr1, len1, addHeapObject(cancel), addHeapObject(progress_handler));
     return takeObject(ret);
 }
 
@@ -337,6 +339,11 @@ export function __wbindgen_string_new(arg0, arg1) {
     return addHeapObject(ret);
 };
 
+export function __wbindgen_object_clone_ref(arg0) {
+    const ret = getObject(arg0);
+    return addHeapObject(ret);
+};
+
 export function __wbindgen_json_parse(arg0, arg1) {
     const ret = JSON.parse(getStringFromWasm0(arg0, arg1));
     return addHeapObject(ret);
@@ -385,11 +392,6 @@ export function __wbindgen_string_get(arg0, arg1) {
     var len0 = WASM_VECTOR_LEN;
     getInt32Memory0()[arg0 / 4 + 1] = len0;
     getInt32Memory0()[arg0 / 4 + 0] = ptr0;
-};
-
-export function __wbindgen_object_clone_ref(arg0) {
-    const ret = getObject(arg0);
-    return addHeapObject(ret);
 };
 
 export function __wbg_instanceof_Window_0e6c0f1096d66c3c(arg0) {
@@ -776,23 +778,23 @@ export function __wbindgen_memory() {
     return addHeapObject(ret);
 };
 
-export function __wbindgen_closure_wrapper1309(arg0, arg1, arg2) {
-    const ret = makeMutClosure(arg0, arg1, 349, __wbg_adapter_26);
+export function __wbindgen_closure_wrapper1312(arg0, arg1, arg2) {
+    const ret = makeMutClosure(arg0, arg1, 347, __wbg_adapter_26);
     return addHeapObject(ret);
 };
 
-export function __wbindgen_closure_wrapper2312(arg0, arg1, arg2) {
-    const ret = makeMutClosure(arg0, arg1, 542, __wbg_adapter_29);
+export function __wbindgen_closure_wrapper2314(arg0, arg1, arg2) {
+    const ret = makeMutClosure(arg0, arg1, 540, __wbg_adapter_29);
     return addHeapObject(ret);
 };
 
-export function __wbindgen_closure_wrapper2449(arg0, arg1, arg2) {
-    const ret = makeMutClosure(arg0, arg1, 582, __wbg_adapter_32);
+export function __wbindgen_closure_wrapper2451(arg0, arg1, arg2) {
+    const ret = makeMutClosure(arg0, arg1, 580, __wbg_adapter_32);
     return addHeapObject(ret);
 };
 
-export function __wbindgen_closure_wrapper2562(arg0, arg1, arg2) {
-    const ret = makeMutClosure(arg0, arg1, 615, __wbg_adapter_35);
+export function __wbindgen_closure_wrapper2564(arg0, arg1, arg2) {
+    const ret = makeMutClosure(arg0, arg1, 613, __wbg_adapter_35);
     return addHeapObject(ret);
 };
 

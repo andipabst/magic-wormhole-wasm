@@ -20,13 +20,26 @@ function downloadFile(data, fileName) {
     window.URL.revokeObjectURL(url);
 }
 
+function cancelPromise() {
+    let cancel;
+    let promise = new Promise(resolve => {
+        cancel = resolve
+    });
+
+    return [promise, cancel];
+}
+
 startButton.addEventListener('click', () => {
     const code = codeInput.value;
 
     if (!code) {
         alert("Please enter a code")
     } else {
-        wasm.receive(wormholeConfig, code, event => console.log(event))
+        const [promise, cancel] = cancelPromise();
+
+        wasm.receive(wormholeConfig, code, promise, event => {
+            console.log(event)
+        })
             .then(x => {
                 console.log("receiving finished", x);
                 if (x) {
@@ -34,13 +47,20 @@ startButton.addEventListener('click', () => {
                     downloadFile(data, filename)
                 }
             })
+            .catch(err => {
+                console.error(err)
+            })
     }
 })
 
 fileInput.addEventListener('input', () => {
-    wasm.send(wormholeConfig, fileInput, event => console.log(event))
+    const [promise, cancel] = cancelPromise();
+    wasm.send(wormholeConfig, fileInput, promise, event => console.log(event))
         .then(x => {
             console.log("sending finished");
+        })
+        .catch(err => {
+            console.error(err)
         })
 })
 

@@ -3,17 +3,19 @@
 /**
 * @param {WormholeConfig} config
 * @param {HTMLInputElement} file_input
+* @param {Promise<any>} cancel
 * @param {Function} progress_handler
 * @returns {Promise<any>}
 */
-export function send(config: WormholeConfig, file_input: HTMLInputElement, progress_handler: Function): Promise<any>;
+export function send(config: WormholeConfig, file_input: HTMLInputElement, cancel: Promise<any>, progress_handler: Function): Promise<any>;
 /**
 * @param {WormholeConfig} config
 * @param {string} code
+* @param {Promise<any>} cancel
 * @param {Function} progress_handler
 * @returns {Promise<any>}
 */
-export function receive(config: WormholeConfig, code: string, progress_handler: Function): Promise<any>;
+export function receive(config: WormholeConfig, code: string, cancel: Promise<any>, progress_handler: Function): Promise<any>;
 /**
 */
 export enum EventType {

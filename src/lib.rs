@@ -1,10 +1,8 @@
 use std::error::Error;
-use std::future::Future;
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::rc::Rc;
-use std::task::{Context, Poll};
 
+use futures_util::future::FutureExt;
 use log::Level;
 use magic_wormhole::{Code, transfer, transit, Wormhole};
 use wasm_bindgen::prelude::*;
@@ -36,18 +34,8 @@ impl WormholeConfig {
     }
 }
 
-struct NoOpFuture {}
-
-impl Future for NoOpFuture {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Pending
-    }
-}
-
 #[wasm_bindgen]
-pub async fn send(config: WormholeConfig, file_input: web_sys::HtmlInputElement, progress_handler: js_sys::Function) -> Result<JsValue, JsValue> {
+pub async fn send(config: WormholeConfig, file_input: web_sys::HtmlInputElement, cancel: js_sys::Promise, progress_handler: js_sys::Function) -> Result<JsValue, JsValue> {
     let event_handler = Rc::new(Box::new(move |e: event::Event| {
         progress_handler.call1(&JsValue::null(), &JsValue::from_serde(&e).unwrap()).expect("progress_handler call should succeed");
     }) as Box<dyn Fn(event::Event)>);
@@ -87,7 +75,7 @@ pub async fn send(config: WormholeConfig, file_input: web_sys::HtmlInputElement,
         move |cur, total| {
             ph(event::progress(cur, total));
         },
-        NoOpFuture {},
+        wasm_bindgen_futures::JsFuture::from(cancel).map(|_x| ()),
     ).await.map_err(stringify)?;
 
     Ok("".into())
@@ -103,7 +91,7 @@ pub struct ReceiveResult {
 fn stringify(e: impl Error) -> String { format!("error code: {}", e) }
 
 #[wasm_bindgen]
-pub async fn receive(config: WormholeConfig, code: String, progress_handler: js_sys::Function) -> Result<JsValue, JsValue> {
+pub async fn receive(config: WormholeConfig, code: String, cancel: js_sys::Promise, progress_handler: js_sys::Function) -> Result<JsValue, JsValue> {
     let event_handler = Rc::new(Box::new(move |e: event::Event| {
         progress_handler.call1(&JsValue::null(), &JsValue::from_serde(&e).unwrap()).expect("progress_handler call should succeed");
     }) as Box<dyn Fn(event::Event)>);
@@ -119,7 +107,7 @@ pub async fn receive(config: WormholeConfig, code: String, progress_handler: js_
         wormhole,
         url::Url::parse(&config.relay_url).unwrap(),
         transit::Abilities::FORCE_RELAY,
-        NoOpFuture {},
+        wasm_bindgen_futures::JsFuture::from(cancel.clone()).map(|_x| ()),
     ).await.map_err(stringify)?.ok_or("")?;
 
     let filename = req.filename.to_str().unwrap_or_default().to_string();
@@ -136,7 +124,7 @@ pub async fn receive(config: WormholeConfig, code: String, progress_handler: js_
             ph(event::progress(cur, total));
         },
         &mut file,
-        NoOpFuture {},
+        wasm_bindgen_futures::JsFuture::from(cancel).map(|_x| ()),
     ).await.map_err(stringify)?;
 
     let result = ReceiveResult {
