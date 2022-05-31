@@ -21,7 +21,7 @@ url = { version = "2.2.2", features = ["serde"] }
 clear_on_drop = { version = "0.2.5", features = ["no_cc"] }
 #magic-wormhole = { git = "https://github.com/andipabst/magic-wormhole.rs"  , rev = "654cf3a" }
 magic-wormhole = { path = "../magic-wormhole.rs" }
-web-sys = { version = "0.3.57", features = ["HtmlElement", "HtmlInputElement", "FileList", "File", "Blob"] }
+web-sys = { version = "0.3.57", features = ["Blob"] }
 js-sys = "0.3.57"
 log = "0.4.17"
 futures-util = "0.3.21"

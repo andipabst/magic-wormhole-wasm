@@ -35,19 +35,11 @@ impl WormholeConfig {
 }
 
 #[wasm_bindgen]
-pub async fn send(config: WormholeConfig, file_input: web_sys::HtmlInputElement, cancel: js_sys::Promise, progress_handler: js_sys::Function) -> Result<JsValue, JsValue> {
+pub async fn send(config: WormholeConfig, file: web_sys::Blob, file_name: String, cancel: js_sys::Promise, progress_handler: js_sys::Function) -> Result<JsValue, JsValue> {
     let event_handler = Rc::new(Box::new(move |e: event::Event| {
         progress_handler.call1(&JsValue::null(), &JsValue::from_serde(&e).unwrap()).expect("progress_handler call should succeed");
     }) as Box<dyn Fn(event::Event)>);
 
-    let file_list = file_input
-        .files()
-        .expect("Failed to get filelist from File Input!");
-    if file_list.length() < 1 || file_list.get(0) == None {
-        return Err("Please select at least one valid file.".into());
-    }
-
-    let file: web_sys::File = file_list.get(0).expect("Failed to get File from filelist!");
     let file_content = wasm_bindgen_futures::JsFuture::from(file.array_buffer()).await?;
     let array = js_sys::Uint8Array::new(&file_content);
     let len = array.byte_length() as u64;
@@ -66,7 +58,7 @@ pub async fn send(config: WormholeConfig, file_input: web_sys::HtmlInputElement,
         wormhole,
         url::Url::parse(&config.relay_url).unwrap(),
         &mut &data_to_send[..],
-        PathBuf::from(file.name()),
+        PathBuf::from(file_name),
         len,
         transit::Abilities::FORCE_RELAY,
         |_info, _address| {

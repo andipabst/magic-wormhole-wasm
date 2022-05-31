@@ -55,7 +55,16 @@ startButton.addEventListener('click', () => {
 
 fileInput.addEventListener('input', () => {
     const [promise, cancel] = cancelPromise();
-    wasm.send(wormholeConfig, fileInput, promise, event => console.log(event))
+
+    const fileList = fileInput.files;
+    if (fileList.length < 1 || !fileList[0]) {
+        console.error("Please select a valid file")
+        return
+    }
+
+    const file = fileList[0]
+
+    wasm.send(wormholeConfig, file, file.name, promise, event => console.log(event))
         .then(x => {
             console.log("sending finished");
         })

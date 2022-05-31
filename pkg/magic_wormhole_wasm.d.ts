@@ -2,12 +2,13 @@
 /* eslint-disable */
 /**
 * @param {WormholeConfig} config
-* @param {HTMLInputElement} file_input
+* @param {Blob} file
+* @param {string} file_name
 * @param {Promise<any>} cancel
 * @param {Function} progress_handler
 * @returns {Promise<any>}
 */
-export function send(config: WormholeConfig, file_input: HTMLInputElement, cancel: Promise<any>, progress_handler: Function): Promise<any>;
+export function send(config: WormholeConfig, file: Blob, file_name: string, cancel: Promise<any>, progress_handler: Function): Promise<any>;
 /**
 * @param {WormholeConfig} config
 * @param {string} code
